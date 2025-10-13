@@ -1,4 +1,4 @@
-# Spindle Positioning Simulation
+# Spindle Orientation and Positioning Model
 
 A computational model for simulating mitotic spindle orientation and positioning during cell division. 
 
