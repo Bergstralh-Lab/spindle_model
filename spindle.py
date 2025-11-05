@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-Spindle Positioning Simulation - Refactored Version
+Spindle Orientation and Positioning model
 ====================================================
 
 Simulates spindle positioning during cell division across multiple cell types:
@@ -10,7 +10,7 @@ Simulates spindle positioning during cell division across multiple cell types:
 - C. elegans embryos (PNC and spindle modes)
 - Zebrafish endothelial cells
 
-Author: [Your name]
+Author: Alikhan Yeltokov
 Date: 2025
 """
 
