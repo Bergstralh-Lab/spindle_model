@@ -10,7 +10,7 @@ Simulates spindle positioning during cell division across multiple cell types:
 - C. elegans embryos (PNC and spindle modes)
 - Zebrafish endothelial cells
 
-Author: [Your name]
+Author: Alikhan Yeltokov
 Date: 2025
 """
 
@@ -78,7 +78,7 @@ class SimulationConfig:
     
     # Discretization
     n_cell_sides: int = 480
-    mt_discretization: int = 2 #no function in the current version
+    mt_discretization: int = 2 #serves no function in the current version
     
     # Paths
     data_dir: Path = field(default_factory=lambda: Path("./data"))
@@ -110,69 +110,48 @@ class SimulationConfig:
 
 @dataclass
 class FollicleEpithelialConfig(SimulationConfig):
-    """Follicular epithelial cell from Drosophila egg chamber."""
-    
     cell_type: Literal["follicle_epithelial"] = "follicle_epithelial"
     cell_radius_a: float = 0.5
     cell_radius_b: float = 0.5
     fg_density: int = 100
-    astral_spread: float = field(init=False, default=0.0)
-    
-    def __post_init__(self):
-        self.astral_spread = 3 * np.pi / 2
+    astral_spread: float = 3 * np.pi / 2
 
 
 @dataclass
 class NeuroblastConfig(SimulationConfig):
-    """Drosophila neuroblast with apical force generators."""
-    
     cell_type: Literal["neuroblast"] = "neuroblast"
     cell_radius_a: float = 0.5
     cell_radius_b: float = 0.5
     fg_density_basal: int = 100
     fg_density_apical: int = 100
-    astral_spread: float = field(init=False, default=0.0)
-    
-    def __post_init__(self):
-        self.astral_spread = 3 * np.pi / 2
+    astral_spread: float = 3 * np.pi / 2
 
 
 @dataclass
 class CElegansPNCConfig(SimulationConfig):
-    """C. elegans pronuclear complex (posterior-enriched FGs)."""
-    
     cell_type: Literal["celegans_pnc"] = "celegans_pnc"
     cell_radius_a: float = 2.5
     cell_radius_b: float = 1.5
     superellipse_n: float = 2.2
     fg_density_anterior: int = 40
     fg_density_posterior: int = 60
-    astral_spread: float = field(init=False, default=0.0)
-    
-    def __post_init__(self):
-        self.catastrophe_rate = 0.014
-        self.rescue_rate = 0.044
-        self.astral_spread = np.pi
-        if self.spindle_angle_init == 0:
-            self.spindle_angle_init = np.pi / 2
+    astral_spread: float = np.pi
+    catastrophe_rate: float = 0.014  # Override parent
+    rescue_rate: float = 0.044        # Override parent
+    spindle_angle_init: float = np.pi / 2  # Override parent - no magic!
 
 
 @dataclass
 class CElegansSpindleConfig(SimulationConfig):
-    """C. elegans spindle positioning (uniform FGs)."""
-    
     cell_type: Literal["celegans_spindle"] = "celegans_spindle"
     cell_radius_a: float = 2.5
     cell_radius_b: float = 1.5
     superellipse_n: float = 2.2
     fg_density_anterior: int = 40
     fg_density_posterior: int = 60
-    astral_spread: float = field(init=False, default=0.0)
-    
-    def __post_init__(self):
-        self.catastrophe_rate = 0.014
-        self.rescue_rate = 0.044
-        self.astral_spread = 3 * np.pi / 2
+    astral_spread: float = 3 * np.pi / 2
+    catastrophe_rate: float = 0.014  # Override parent
+    rescue_rate: float = 0.044        # Override parent
 
 
 @dataclass
@@ -180,13 +159,17 @@ class ZebrafishEndoConfig(SimulationConfig):
     """Zebrafish endothelial cell from live imaging."""
     
     cell_type: Literal["zebrafish_endo"] = "zebrafish_endo"
-    endo_index: int = 1  # Default to first cell
+    endo_index: int = 1
     fg_distribution: Literal["uniform", "junctions"] = "uniform"
     fg_density: int = 10
     
     cell_radius_a: float = 1.0
     cell_radius_b: float = 1.0
-    astral_spread: float = field(init=False, default=0.0)
+    astral_spread: float = 3 * np.pi / 2
+    
+    # Override parent's required field to be optional
+    # If None, loads from Excel; if set, uses user value
+    total_time: Optional[float] = None
     
     movie_info_file: Path = field(default_factory=lambda: Path("./data/Movie_info.xlsx"))
     cell_images_dir: Path = field(default_factory=lambda: Path("./data/cells"))
@@ -196,11 +179,18 @@ class ZebrafishEndoConfig(SimulationConfig):
     extras: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
+        # Validation
         if self.fg_distribution == "junctions" and self.junction_data_dir is None:
             raise ValueError("junction_data_dir required for junctions mode")
         
+        # Load parameters from Excel
         self._load_from_excel()
-        self.astral_spread = 1.5 * np.pi
+        
+        # Only override total_time if user didn't provide it
+        if self.total_time is None:
+            self.total_time = ((self.extras["anaphase_on"] - self.extras["metaphase"]) 
+                              * self.extras["frame_rate"])
+        
     
     def _load_from_excel(self):
         """Load cell parameters from Movie_info.xlsx."""
@@ -224,8 +214,7 @@ class ZebrafishEndoConfig(SimulationConfig):
             "spindle_width": float(row["Spindle width"]),
         }
         
-        self.total_time = ((self.extras["anaphase_on"] - self.extras["metaphase"]) 
-                          * self.extras["frame_rate"])
+        # Always override these from Excel (not optional)
         self.spindle_half_length = 0.1 * self.extras["spindle_length"] / 2.0
         self.spindle_width = 0.1 * self.extras["spindle_width"] / 2.0
         self.spindle_angle_init = np.deg2rad(self.extras["initial_angle"])
@@ -664,7 +653,7 @@ def make_fgs_zebrafish(
 
 
 def load_junctions(config: ZebrafishEndoConfig) -> np.ndarray:
-    """Load junction data for zebrafish cells."""
+    """Load junction coordinates for zebrafish cells."""
     junction_file = (config.junction_data_dir / 
                     f"C{config.endo_index}_Mask_Movie_Junctions.txt")
     
@@ -684,7 +673,7 @@ def get_real_cell_zebrafish(
     config: ZebrafishEndoConfig,
     t_time: float = 0
 ) -> np.ndarray:
-    """Load and process cell shape from microscopy images."""
+    """Load and process cell contours from microscopy images."""
     frame = int(config.extras["metaphase"] + t_time / config.extras["frame_rate"])
     
     # Load cell image
@@ -2151,7 +2140,7 @@ def example_zebrafish_uniform():
     """Example: Zebrafish with uniform FG distribution."""
     config = ZebrafishEndoConfig(
         time_step=0.05,
-        total_time=30.0,
+        total_time=30.0,# If commented out, it will run full simulation
         spindle_half_length=0.18,
         spindle_width=0.08,
         spindle_angle_init=0,
