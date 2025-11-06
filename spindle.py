@@ -41,7 +41,7 @@ import matplotlib.colors as mcolors
 @dataclass
 class SimulationConfig:
     """Core simulation parameters shared by all cell types."""
-    
+    # Force units are in pN, distances is in custom model units where 1 model unit = 10 µm (will change to micrometers in the next version), time in s
     # Time & discretization
     time_step: float
     total_time: float
@@ -59,7 +59,7 @@ class SimulationConfig:
     
     # Forces & dynamics
     pull_force: float = 5.0
-    push_force: float = 0.0
+    push_force: float = 5.0
     growth_rate: float = 0.013
     shrink_rate: float = -0.027
     catastrophe_rate: float = 0.021
@@ -69,7 +69,7 @@ class SimulationConfig:
     
     # Physical constants
     viscosity: float = 100.0
-    bending_rigidity: float = 2.0
+    bending_rigidity: float = 0.2
     min_cortex_distance: float = 0.01
     push_distance: float = 0.0005
     max_interaction_distance: float = 0.02
@@ -78,7 +78,7 @@ class SimulationConfig:
     
     # Discretization
     n_cell_sides: int = 480
-    mt_discretization: int = 2
+    mt_discretization: int = 2 #no function in the current version
     
     # Paths
     data_dir: Path = field(default_factory=lambda: Path("./data"))
@@ -588,7 +588,7 @@ def make_fgs_follicle(config: FollicleEpithelialConfig) -> np.ndarray:
 
 
 def make_fgs_neuroblast(config: NeuroblastConfig) -> np.ndarray:
-    """Basal/lateral + apical FGs."""
+    """Apical FGs."""
     a, b = config.cell_radius_a, config.cell_radius_b
     
     # Apical
@@ -2109,7 +2109,7 @@ def example_celegans_pnc():
     """Example: C. elegans PNC."""
     config = CElegansPNCConfig(
         time_step=0.05,
-        total_time=10.0,
+        total_time=30.0,
         spindle_half_length=0.5,
         spindle_width=0.5,
         spindle_angle_init=0,  # Auto-set to 90°
@@ -2151,7 +2151,7 @@ def example_zebrafish_uniform():
     """Example: Zebrafish with uniform FG distribution."""
     config = ZebrafishEndoConfig(
         time_step=0.05,
-        total_time=100.0,
+        total_time=30.0,
         spindle_half_length=0.18,
         spindle_width=0.08,
         spindle_angle_init=0,
