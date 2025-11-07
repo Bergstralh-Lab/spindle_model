@@ -562,7 +562,7 @@ def make_fgs_follicle(config: FollicleEpithelialConfig) -> np.ndarray:
     n = config.fg_density
     a, b = config.cell_radius_a, config.cell_radius_b
     
-    angles = gaussian_angles(n // 2, mu=10.7, sigma=30.3, limits=(-60, 60))
+    angles = gaussian_angles(n // 2, mu=10.7, sigma=30.3, limits=(-60, 60)) # from Neville et al. 2023 Mud signal distribution (https://doi.org/10.15252/embr.202256074)
     fgs_right = np.column_stack([
         a * np.cos(np.deg2rad(angles)),
         b * np.sin(np.deg2rad(angles))
@@ -580,7 +580,7 @@ def make_fgs_neuroblast(config: NeuroblastConfig) -> np.ndarray:
     
     # Apical
     n_apical = config.fg_density_apical
-    angles_apical = gaussian_angles(n_apical, mu=90, sigma=30.3, limits=(45, 135))
+    angles_apical = gaussian_angles(n_apical, mu=90, sigma=30.3, limits=(45, 135)) 
     fgs_apical = np.column_stack([
         a * np.cos(np.deg2rad(angles_apical)),
         b * np.sin(np.deg2rad(angles_apical))
