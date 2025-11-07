@@ -81,13 +81,13 @@ class SimulationConfig:
     mt_discretization: int = 2 #serves no function in the current version
     
     # Paths
-    data_dir: Path = field(default_factory=lambda: Path("./data"))
-    output_dir: Path = field(default_factory=lambda: Path("./output"))
+    data_dir: Path = Path("./data")
+    output_dir: Path = Path("./output")
     
     # Visualization
     show_force_vectors: bool = False
     save_plots: bool = True
-    plot_interval: int = 1
+    plot_interval: int = 20 # in time steps
     
     # Advanced
     length_distribution: Literal["gamma", "constant"] = "gamma"
@@ -110,7 +110,7 @@ class SimulationConfig:
 
 @dataclass
 class FollicleEpithelialConfig(SimulationConfig):
-    cell_type: Literal["follicle_epithelial"] = "follicle_epithelial"
+    cell_type: str = "follicle_epithelial"
     cell_radius_a: float = 0.5
     cell_radius_b: float = 0.5
     fg_density: int = 100
@@ -119,7 +119,7 @@ class FollicleEpithelialConfig(SimulationConfig):
 
 @dataclass
 class NeuroblastConfig(SimulationConfig):
-    cell_type: Literal["neuroblast"] = "neuroblast"
+    cell_type: str = "neuroblast"
     cell_radius_a: float = 0.5
     cell_radius_b: float = 0.5
     fg_density_basal: int = 100
@@ -129,7 +129,7 @@ class NeuroblastConfig(SimulationConfig):
 
 @dataclass
 class CElegansPNCConfig(SimulationConfig):
-    cell_type: Literal["celegans_pnc"] = "celegans_pnc"
+    cell_type: str = "celegans_pnc"
     cell_radius_a: float = 2.5
     cell_radius_b: float = 1.5
     superellipse_n: float = 2.2
@@ -138,12 +138,12 @@ class CElegansPNCConfig(SimulationConfig):
     astral_spread: float = np.pi
     catastrophe_rate: float = 0.014  # Override parent
     rescue_rate: float = 0.044        # Override parent
-    spindle_angle_init: float = np.pi / 2  # Override parent - no magic!
+    spindle_angle_init: float = np.pi / 2  # Override parent
 
 
 @dataclass
 class CElegansSpindleConfig(SimulationConfig):
-    cell_type: Literal["celegans_spindle"] = "celegans_spindle"
+    cell_type: str = "celegans_spindle"
     cell_radius_a: float = 2.5
     cell_radius_b: float = 1.5
     superellipse_n: float = 2.2
@@ -157,23 +157,23 @@ class CElegansSpindleConfig(SimulationConfig):
 @dataclass
 class ZebrafishEndoConfig(SimulationConfig):
     """Zebrafish endothelial cell from live imaging."""
-    
-    cell_type: Literal["zebrafish_endo"] = "zebrafish_endo"
+
+    cell_type: str = "zebrafish_endo"
     endo_index: int = 1
-    fg_distribution: Literal["uniform", "junctions"] = "uniform"
+    fg_distribution: Literal["uniform", "junctions"] = "junctions"
     fg_density: int = 10
     
     cell_radius_a: float = 1.0
     cell_radius_b: float = 1.0
-    astral_spread: float = 3 * np.pi / 2
+    astral_spread: float = 1.5 * np.pi
     
     # Override parent's required field to be optional
     # If None, loads from Excel; if set, uses user value
     total_time: Optional[float] = None
     
-    movie_info_file: Path = field(default_factory=lambda: Path("./data/Movie_info.xlsx"))
-    cell_images_dir: Path = field(default_factory=lambda: Path("./data/cells"))
-    spindle_images_dir: Path = field(default_factory=lambda: Path("./data/spindles"))
+    movie_info_file: Path = Path("./data/Movie_info.xlsx")
+    cell_images_dir: Path = Path("./data/cells")
+    spindle_images_dir: Path = Path("./data/spindles")
     junction_data_dir: Optional[Path] = None
     
     extras: Optional[Dict[str, Any]] = None
@@ -190,7 +190,6 @@ class ZebrafishEndoConfig(SimulationConfig):
         if self.total_time is None:
             self.total_time = ((self.extras["anaphase_on"] - self.extras["metaphase"]) 
                               * self.extras["frame_rate"])
-        
     
     def _load_from_excel(self):
         """Load cell parameters from Movie_info.xlsx."""
@@ -246,7 +245,7 @@ class SimulationState:
     which_push: np.ndarray
     free_fgs: np.ndarray
     astral_which_fg: np.ndarray
-    velocity_com: np.ndarray = field(default_factory=lambda: np.zeros(2))
+    velocity_com: Optional[np.ndarray] = None
 
 
 # ============================================================================
@@ -693,7 +692,7 @@ def get_real_cell_zebrafish(
     
     # Get spindle center for normalization
     spindle_image_dir = config.spindle_images_dir / f"spindle_{config.endo_index}"
-    if config.endo_index > 12:
+    if config.endo_index > 9:
         spindle_path = spindle_image_dir / f"Mask_{int(config.extras['metaphase'])}.jpg"
     else:
         spindle_path = spindle_image_dir / f"Spindle_{int(config.extras['metaphase'])}.jpg"
@@ -1716,7 +1715,7 @@ def draw_chromosome(x: float, y: float, angle: float) -> Tuple[np.ndarray, np.nd
 
 
 # ============================================================================
-# EXCEL OUTPUT (MATCHING ORIGINAL FORMAT)
+# EXCEL OUTPUT
 # ============================================================================
 
 def save_results_to_excel(
