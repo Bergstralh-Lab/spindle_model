@@ -539,7 +539,6 @@ def intersect_cell(
 def make_fgs(
     config: CellConfig,
     cell: np.ndarray,
-    spindle_poles: np.ndarray,
     frame: int = 1
 ) -> np.ndarray:
     """Generate force generator (motor protein) binding positions."""
@@ -690,7 +689,7 @@ def get_real_cell_zebrafish(
     
     cell = enhance_cell(cell_input)
     
-    # Get spindle center for normalization
+    # Get spindle center for recentering (0,0 at spindle center at time 0)
     spindle_image_dir = config.spindle_images_dir / f"spindle_{config.endo_index}"
     if config.endo_index > 9:
         spindle_path = spindle_image_dir / f"Mask_{int(config.extras['metaphase'])}.jpg"
@@ -773,7 +772,7 @@ def initialize_spindle(
     # Cell-type specific displacement
     displacement = np.array([0.0, 0.0])
     if isinstance(config, CElegansPNCConfig):
-        displacement = np.array([1.0, 0.0])
+        displacement = np.array([1.0, 0.0]) # Shift toward posterior
     
     spindle_poles[0] = [
         r * np.cos(spindle_angle) + displacement[0],
@@ -1806,7 +1805,7 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     
     cell = make_cell_boundary(config, t_time=0)
     spindle_poles, spindle_angle = initialize_spindle(config, cell)
-    fgs = make_fgs(config, cell, spindle_poles, frame=1)
+    fgs = make_fgs(config, cell, frame=1)
     
     (astral_mts, astral_angles, mt_states, which_push, which_bind,
      free_fgs, astral_which_fg, mt_lengths) = initialize_microtubules(
