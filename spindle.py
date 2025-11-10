@@ -1003,7 +1003,58 @@ def check_mt_interactions(
     
     return bind, push, state, free_fgs, astral_which_fg
 
-
+def check_mt_interactions_init(
+    config: CellConfig,
+    pole_idx: int,
+    mt_idx: int,
+    mt_tip: np.ndarray,
+    spindle_poles: np.ndarray,
+    fgs: np.ndarray,
+    free_fgs: np.ndarray,
+    astral_which_fg: np.ndarray,
+    state: int,
+    angle: float,
+    cell: np.ndarray
+) -> Tuple[int, int, int, np.ndarray, np.ndarray]:
+    """
+    Check if MT binds to FG or pushes against cortex.
+    
+    Returns:
+        bind: 1 if bound, 0 otherwise
+        push: 1 if pushing, 0 otherwise
+        state: Updated state
+        free_fgs: Updated availability
+        astral_which_fg: Updated assignments
+    """
+    bind = 0
+    push = 0
+    
+    prob_cat, prob_res, prob_bind, prob_unbind = config.get_probabilities()
+    
+    # Check binding to FGs
+    dist = distance_matrix(np.array([mt_tip]), fgs)
+    min_dist_idx = np.argmin(dist[0])
+    min_dist = dist[0, min_dist_idx]
+    
+    if (min_dist <= config.max_interaction_distance and 
+        free_fgs[min_dist_idx] == 0 ):
+        
+        free_fgs[min_dist_idx] = 1
+        bind = 1
+        state = -1  # Switch to shrinking
+        astral_which_fg[min_dist_idx, 0] = pole_idx
+        astral_which_fg[min_dist_idx, 1] = mt_idx
+    
+    else:
+        # Check pushing against cortex
+        cortex_point, _ = intersect_cell(angle, spindle_poles[pole_idx], cell)
+        dist_to_cortex = LA.norm(cortex_point - mt_tip)
+        
+        if dist_to_cortex <= config.push_distance:
+            push = 1
+            state = 1  # Keep growing
+    
+    return bind, push, state, free_fgs, astral_which_fg
 # ============================================================================
 # FORCE CALCULATIONS
 # ============================================================================
