@@ -1,0 +1,16 @@
+{
+  "cell_type": "follicle_epithelial",
+  "time_step": 0.05,
+  "total_time": 10.0,
+  "spindle_half_length": 0.4,
+  "spindle_width": 0.32,
+  "spindle_angle_init": 1.5708,
+  "n_astral_mts": 100,
+  "fg_density": 100,
+  "mt_mean_length": 1.0,
+  "mt_length_stdev": 1.0,
+  "pull_force": 2.0,
+  "push_force": 2.0,
+  "data_dir": "./data",
+  "output_dir": "./output"
+}

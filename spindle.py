@@ -1851,8 +1851,8 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     print(f"{'='*80}\n")
     
     # Initialize
-    np.random.seed(config.seed)
-    random.seed(config.seed)
+    np.random.seed(config.seed+run_id-1)
+    random.seed(config.seed+run_id-1)
     
     cell = make_cell_boundary(config, t_time=0)
     spindle_poles, spindle_angle = initialize_spindle(config, cell)
