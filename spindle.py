@@ -1507,7 +1507,7 @@ def plot_cell(
     output_dir: Path
 ):
     """
-    Plot cell, spindle, MTs, and forces (original visualization style).
+    Plot cell, spindle, MTs, and forces.
     
     Args:
         config: Simulation configuration
@@ -1960,7 +1960,8 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
         
         # Calculate forces
         push_forces, pull_forces = calculate_forces(config, state)
-        
+        push_forces_list.append(push_forces)
+        pull_forces_list.append(pull_forces)
         # Update spindle
         new_poles, new_angle, velocity = update_spindle_position(
             config, state, push_forces, pull_forces
@@ -1994,21 +1995,17 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
         angles.append(np.rad2deg(state.spindle_angle))
         centers.append(np.mean(state.spindle_poles, axis=0))
         
-        # Calculate and store forces for this timestep
-        push_forces, pull_forces = calculate_forces(config, state)
-        push_forces_list.append(push_forces)
-        pull_forces_list.append(pull_forces)
         
         # Plot at specified intervals
-        if (step + 1) % config.plot_interval == 0:
-            push_forces, pull_forces = calculate_forces(config, state)
+        if config.save_plots and (step + 1) % config.plot_interval == 0 :
+            # push_forces, pull_forces = calculate_forces(config, state)
             plot_cell(config, state, push_forces, pull_forces, step + 1, output_dir)
         
         # Progress
-        if (step + 1) % 100 == 0:
-            print(f"  Step {step+1}/{n_steps} - " +
-                  f"t={state.time:.2f}s - " +
-                  f"angle={np.rad2deg(state.spindle_angle):.1f}°")
+        # if (step + 1) % 100 == 0:
+        #     print(f"  Step {step+1}/{n_steps} - " +
+        #           f"t={state.time:.2f}s - " +
+        #           f"angle={np.rad2deg(state.spindle_angle):.1f}°")
     
     print(f"\n{'='*80}")
     print("Simulation complete!")
