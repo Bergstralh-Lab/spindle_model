@@ -1,48 +1,204 @@
-# Spindle Orientation and Positioning Model
+# Spindle Positioning Simulation - User Guide
 
-A computational model for simulating mitotic spindle orientation and positioning during cell division. 
-
-## Installation
-
-```bash
-pip install numpy pandas openpyxl matplotlib opencv-python shapely scipy
-```
+A computational model for simulating mitotic spindle positioning across multiple cell types during cell division.
 
 ## Quick Start
 
-```python
-from spindle import CElegansSpindleConfig, simulate
+### Single Simulation
+```bash
+# Basic follicle epithelial cell simulation
+python spindle.py --cell_type follicle_epithelial
 
-# Create and run simulation
-config = CElegansSpindleConfig(
-    time_step=0.05,
-    total_time=10.0,
-    n_astral_mts=100,
-    pull_force=5.0,
-    push_force=5.0
-)
-
-results = simulate(config, run_id=1)
+# With custom parameters
+python spindle.py --cell_type follicle_epithelial --n_astral_mts 100 --pull_force 8.0
 ```
 
-Or use built-in examples:
-
-```python
-from spindle import example_celegans_spindle
-results = example_celegans_spindle()
+### Parameter Sweep
+```bash
+# Edit parameter arrays in multi_param_submit.sh, then run:
+./multi_param_submit.sh
 ```
 
-## Supported Cell Types
+## Cell Types & Key Parameters
 
-- **Follicular Epithelial** (`FollicleEpithelialConfig`) - *Drosophila* egg chamber
-- **Neuroblast** (`NeuroblastConfig`) - *Drosophila* with apical force generators
-- **C. elegans PNC** (`CElegansPNCConfig`) - Posterior-enriched motors
-- **C. elegans Spindle** (`CElegansSpindleConfig`) - Uniform distribution
-- **Zebrafish Endothelial** (`ZebrafishEndoConfig`) - Live imaging data
+### Follicle Epithelial (`follicle_epithelial`)
+*Drosophila* follicular epithelium with basal/lateral force generators
+```bash
+python spindle.py --cell_type follicle_epithelial \
+  --n_astral_mts 100 \           # Microtubules per pole
+  --fg_density 100 \             # Number of force generators
+  --pull_force 5.0 \             # Pulling force (pN)
+  --spindle_half_length 0.4      # Half-length of spindle
+```
 
-## Output
+### Neuroblast (`neuroblast`)
+*Drosophila* neuroblasts with apical force generator enrichment
+```bash
+python spindle.py --cell_type neuroblast \
+  --n_astral_mts 100 \
+  --fg_density_apical 100 \      # Apical force generators
+  --fg_density_basal 100 \       # Basal force generators  
+  --pull_force 5.0
+```
 
-Results are saved to `output/SM_{cell_type}_run_{id}/`:
-- `config.json` - Simulation parameters
-- `{cell_type}_{step}.pdf` - Visualization frames
-- `{cell_type}_data.xlsx` - Time series data (angle, forces, MT counts)
+### C. elegans PNC (`celegans_pnc`)
+Posterior-enriched force generators, superellipse geometry
+```bash
+python spindle.py --cell_type celegans_pnc \
+  --n_astral_mts 100 \
+  --fg_density_anterior 40 \     # Anterior force generators
+  --fg_density_posterior 60 \    # Posterior force generators
+  --mt_mean_length 9.0           # Longer MTs than other systems
+```
+
+### C. elegans Spindle (`celegans_spindle`)
+Uniform force distribution, superellipse geometry
+```bash
+python spindle.py --cell_type celegans_spindle \
+  --n_astral_mts 100 \
+  --fg_density_anterior 40 \
+  --fg_density_posterior 60 \
+  --push_force 5.0               # Include pushing forces
+```
+
+### Zebrafish Endothelial (`zebrafish_endo`)
+Live imaging data with dynamic cell shapes
+```bash
+python spindle.py --cell_type zebrafish_endo \
+  --endo_index 11 \              # Cell index from experimental data
+  --fg_density 10 \              # Density per unit perimeter (not count!)
+  --fg_distribution uniform      # or "junctions" (requires junction data)
+```
+
+## Important Parameter Notes
+
+### Microtubules (`n_astral_mts`)
+- **Per pole** - if you set 100, total MTs = 200 (100 per spindle pole)
+- Typical ranges: 50-200 per pole
+- More MTs = stronger forces but slower simulation
+
+### Force Generators (`fg_density`)
+- **Zebrafish**: Actual density (FGs per unit perimeter) - default 10
+- **All others**: Actual count of force generators - default 100
+- Controls cortical force magnitude
+
+### Forces
+- `pull_force`: Magnitude when MT binds to cortical motor (pN)
+- `push_force`: Magnitude when MT pushes against cortex (pN)  
+- Typical: 0-10 pN range
+
+### Timing
+- `time_step`: Integration timestep (s) - default 0.05
+- `total_time`: Simulation duration (s) - default 30.0
+- Smaller timesteps = more accurate but slower
+
+## Common Parameter Combinations
+
+### High Force Regime
+```bash
+python spindle.py --cell_type follicle_epithelial \
+  --n_astral_mts 200 --pull_force 10.0 --push_force 2.0
+```
+
+### Fine Dynamics
+```bash
+python spindle.py --cell_type neuroblast \
+  --time_step 0.01 --total_time 10.0 --fg_density_apical 200
+```
+
+### Quick Test Run
+```bash
+python spindle.py --cell_type follicle_epithelial \
+  --total_time 5.0 --no_plots --n_astral_mts 50
+```
+
+## Parameter Sweeps
+
+### Single Parameter
+Edit `multi_param_submit.sh`:
+```bash
+# Change these arrays:
+n_astral_mts=(50 100 200)        # Parameter to sweep
+pull_force=(5)                   # Keep others fixed
+push_force=(0.0)
+spindle_half_length=(0.45)
+```
+
+### Multi-Parameter
+```bash
+# Test different combinations:
+n_astral_mts=(100 200)
+pull_force=(3.0 5.0 8.0)
+push_force=(0.0 2.0)
+spindle_half_length=(0.4 0.5)
+# Results in 2×3×2×2 = 24 parameter combinations
+```
+
+### Custom Parameters
+Add any parameter to the `args` line:
+```bash
+args="--cell_type $CELL_TYPE --n_astral_mts $n_mts --viscosity 150 --time_step 0.01"
+```
+
+## Output Structure
+
+### Single Run
+```
+output/SM_follicle_epithelial_run_1/
+├── config.json                    # Parameters used
+├── follicle_epithelial_*.pdf      # Simulation snapshots
+└── follicle_epithelial_data.xlsx  # Time series data
+```
+
+### Parameter Sweep
+```
+output/2024-11-12/                 # Date of run
+└── follicle_epithelial_MT_100_pull_5_push_0.0_SL_0.45_test_1/
+    ├── config.json
+    ├── *_images/
+    │   ├── *_task_1/              # Run 1 plots
+    │   └── *_task_20/             # Run 20 plots
+    └── *_stats/
+        ├── task_1.xlsx            # Run 1 data
+        └── task_20.xlsx           # Run 20 data
+```
+
+## Excel Data Format
+
+Each Excel file contains sheets:
+- **Angle**: Spindle angle over time (degrees)
+- **N_pull**: Number of pulling microtubules
+- **N_push**: Number of pushing microtubules  
+- **Pull_t**: Total pulling force (pN)
+- **Push_t**: Total pushing force (pN)
+- **Ratio**: Pull/(Pull+Push) percentage
+
+## SLURM Management
+
+```bash
+# Submit parameter sweep
+./multi_param_submit.sh
+
+# Check jobs
+squeue -u $USER
+
+# Cancel all jobs
+scancel -u $USER
+
+# Monitor specific job
+seff JOBID
+```
+
+## Common Issues
+
+**Memory errors**: Reduce `n_astral_mts` or use `--no_plots`
+
+**Long runtimes**: Decrease `total_time` or increase `time_step`
+
+**Zebrafish data missing**: Ensure `./data/` contains experimental files
+
+**Wrong FG counts**: Remember zebrafish uses density, others use count
+
+---
+
+**Parameter sweep workflow**: Edit arrays → Run script → Monitor jobs → Analyze results

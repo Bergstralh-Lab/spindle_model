@@ -41,7 +41,7 @@ import matplotlib.colors as mcolors
 @dataclass
 class SimulationConfig:
     """Core simulation parameters shared by all cell types."""
-    # Force units are in pN, distances is in custom model units where 1 model unit = 10 µm (will change to micrometers in the next version), time in s
+    # Force units are in pN, distances is in custom model units where 1 model unit = 10 Âµm (will change to micrometers in the next version), time in s
     # Time & discretization
     time_step: float
     total_time: float
@@ -81,13 +81,13 @@ class SimulationConfig:
     mt_discretization: int = 2 #serves no function in the current version
     
     # Paths
-    data_dir: Path = Path("./data")
-    output_dir: Path = Path("./output")
+    data_dir: Path = field(default_factory=lambda: Path("./data"))
+    output_dir: Path = field(default_factory=lambda: Path("./output"))
     
     # Visualization
     show_force_vectors: bool = False
     save_plots: bool = True
-    plot_interval: int = 20 # in time steps
+    plot_interval: int = 40
     
     # Advanced
     length_distribution: Literal["gamma", "constant"] = "gamma"
@@ -110,7 +110,7 @@ class SimulationConfig:
 
 @dataclass
 class FollicleEpithelialConfig(SimulationConfig):
-    cell_type: str = "follicle_epithelial"
+    cell_type: Literal["follicle_epithelial"] = "follicle_epithelial"
     cell_radius_a: float = 0.5
     cell_radius_b: float = 0.5
     fg_density: int = 100
@@ -119,7 +119,7 @@ class FollicleEpithelialConfig(SimulationConfig):
 
 @dataclass
 class NeuroblastConfig(SimulationConfig):
-    cell_type: str = "neuroblast"
+    cell_type: Literal["neuroblast"] = "neuroblast"
     cell_radius_a: float = 0.5
     cell_radius_b: float = 0.5
     fg_density_basal: int = 100
@@ -129,7 +129,7 @@ class NeuroblastConfig(SimulationConfig):
 
 @dataclass
 class CElegansPNCConfig(SimulationConfig):
-    cell_type: str = "celegans_pnc"
+    cell_type: Literal["celegans_pnc"] = "celegans_pnc"
     cell_radius_a: float = 2.5
     cell_radius_b: float = 1.5
     superellipse_n: float = 2.2
@@ -138,12 +138,12 @@ class CElegansPNCConfig(SimulationConfig):
     astral_spread: float = np.pi
     catastrophe_rate: float = 0.014  # Override parent
     rescue_rate: float = 0.044        # Override parent
-    spindle_angle_init: float = np.pi / 2  # Override parent
+    spindle_angle_init: float = np.pi / 2  # Override parent - no magic!
 
 
 @dataclass
 class CElegansSpindleConfig(SimulationConfig):
-    cell_type: str = "celegans_spindle"
+    cell_type: Literal["celegans_spindle"] = "celegans_spindle"
     cell_radius_a: float = 2.5
     cell_radius_b: float = 1.5
     superellipse_n: float = 2.2
@@ -157,23 +157,23 @@ class CElegansSpindleConfig(SimulationConfig):
 @dataclass
 class ZebrafishEndoConfig(SimulationConfig):
     """Zebrafish endothelial cell from live imaging."""
-
-    cell_type: str = "zebrafish_endo"
+    
+    cell_type: Literal["zebrafish_endo"] = "zebrafish_endo"
     endo_index: int = 1
-    fg_distribution: Literal["uniform", "junctions"] = "junctions"
+    fg_distribution: Literal["uniform", "junctions"] = "uniform"
     fg_density: int = 10
     
     cell_radius_a: float = 1.0
     cell_radius_b: float = 1.0
-    astral_spread: float = 1.5 * np.pi
+    astral_spread: float = 3 * np.pi / 2
     
     # Override parent's required field to be optional
     # If None, loads from Excel; if set, uses user value
     total_time: Optional[float] = None
     
-    movie_info_file: Path = Path("./data/Movie_info.xlsx")
-    cell_images_dir: Path = Path("./data/cells")
-    spindle_images_dir: Path = Path("./data/spindles")
+    movie_info_file: Path = field(default_factory=lambda: Path("./data/Movie_info.xlsx"))
+    cell_images_dir: Path = field(default_factory=lambda: Path("./data/cells"))
+    spindle_images_dir: Path = field(default_factory=lambda: Path("./data/spindles"))
     junction_data_dir: Optional[Path] = None
     
     extras: Optional[Dict[str, Any]] = None
@@ -190,6 +190,7 @@ class ZebrafishEndoConfig(SimulationConfig):
         if self.total_time is None:
             self.total_time = ((self.extras["anaphase_on"] - self.extras["metaphase"]) 
                               * self.extras["frame_rate"])
+        
     
     def _load_from_excel(self):
         """Load cell parameters from Movie_info.xlsx."""
@@ -245,7 +246,7 @@ class SimulationState:
     which_push: np.ndarray
     free_fgs: np.ndarray
     astral_which_fg: np.ndarray
-    velocity_com: Optional[np.ndarray] = None
+    velocity_com: np.ndarray = field(default_factory=lambda: np.zeros(2))
 
 
 # ============================================================================
@@ -539,6 +540,7 @@ def intersect_cell(
 def make_fgs(
     config: CellConfig,
     cell: np.ndarray,
+    spindle_poles: np.ndarray,
     frame: int = 1
 ) -> np.ndarray:
     """Generate force generator (motor protein) binding positions."""
@@ -562,7 +564,7 @@ def make_fgs_follicle(config: FollicleEpithelialConfig) -> np.ndarray:
     n = config.fg_density
     a, b = config.cell_radius_a, config.cell_radius_b
     
-    angles = gaussian_angles(n // 2, mu=10.7, sigma=30.3, limits=(-60, 60)) # from Neville et al. 2023 Mud signal distribution (https://doi.org/10.15252/embr.202256074)
+    angles = gaussian_angles(n // 2, mu=10.7, sigma=30.3, limits=(-60, 60))
     fgs_right = np.column_stack([
         a * np.cos(np.deg2rad(angles)),
         b * np.sin(np.deg2rad(angles))
@@ -580,7 +582,7 @@ def make_fgs_neuroblast(config: NeuroblastConfig) -> np.ndarray:
     
     # Apical
     n_apical = config.fg_density_apical
-    angles_apical = gaussian_angles(n_apical, mu=90, sigma=30.3, limits=(45, 135)) 
+    angles_apical = gaussian_angles(n_apical, mu=90, sigma=30.3, limits=(45, 135))
     fgs_apical = np.column_stack([
         a * np.cos(np.deg2rad(angles_apical)),
         b * np.sin(np.deg2rad(angles_apical))
@@ -689,9 +691,9 @@ def get_real_cell_zebrafish(
     
     cell = enhance_cell(cell_input)
     
-    # Get spindle center for recentering (0,0 at spindle center at time 0)
+    # Get spindle center for normalization
     spindle_image_dir = config.spindle_images_dir / f"spindle_{config.endo_index}"
-    if config.endo_index > 9:
+    if config.endo_index > 12:
         spindle_path = spindle_image_dir / f"Mask_{int(config.extras['metaphase'])}.jpg"
     else:
         spindle_path = spindle_image_dir / f"Spindle_{int(config.extras['metaphase'])}.jpg"
@@ -772,7 +774,7 @@ def initialize_spindle(
     # Cell-type specific displacement
     displacement = np.array([0.0, 0.0])
     if isinstance(config, CElegansPNCConfig):
-        displacement = np.array([1.0, 0.0]) # Shift toward posterior
+        displacement = np.array([1.0, 0.0])
     
     spindle_poles[0] = [
         r * np.cos(spindle_angle) + displacement[0],
@@ -1003,58 +1005,7 @@ def check_mt_interactions(
     
     return bind, push, state, free_fgs, astral_which_fg
 
-def check_mt_interactions_init(
-    config: CellConfig,
-    pole_idx: int,
-    mt_idx: int,
-    mt_tip: np.ndarray,
-    spindle_poles: np.ndarray,
-    fgs: np.ndarray,
-    free_fgs: np.ndarray,
-    astral_which_fg: np.ndarray,
-    state: int,
-    angle: float,
-    cell: np.ndarray
-) -> Tuple[int, int, int, np.ndarray, np.ndarray]:
-    """
-    Check if MT binds to FG or pushes against cortex.
-    
-    Returns:
-        bind: 1 if bound, 0 otherwise
-        push: 1 if pushing, 0 otherwise
-        state: Updated state
-        free_fgs: Updated availability
-        astral_which_fg: Updated assignments
-    """
-    bind = 0
-    push = 0
-    
-    prob_cat, prob_res, prob_bind, prob_unbind = config.get_probabilities()
-    
-    # Check binding to FGs
-    dist = distance_matrix(np.array([mt_tip]), fgs)
-    min_dist_idx = np.argmin(dist[0])
-    min_dist = dist[0, min_dist_idx]
-    
-    if (min_dist <= config.max_interaction_distance and 
-        free_fgs[min_dist_idx] == 0 ):
-        
-        free_fgs[min_dist_idx] = 1
-        bind = 1
-        state = -1  # Switch to shrinking
-        astral_which_fg[min_dist_idx, 0] = pole_idx
-        astral_which_fg[min_dist_idx, 1] = mt_idx
-    
-    else:
-        # Check pushing against cortex
-        cortex_point, _ = intersect_cell(angle, spindle_poles[pole_idx], cell)
-        dist_to_cortex = LA.norm(cortex_point - mt_tip)
-        
-        if dist_to_cortex <= config.push_distance:
-            push = 1
-            state = 1  # Keep growing
-    
-    return bind, push, state, free_fgs, astral_which_fg
+
 # ============================================================================
 # FORCE CALCULATIONS
 # ============================================================================
@@ -1134,7 +1085,7 @@ def calculate_torque(
     sign1 = np.sign(np.cross(poles_unit, force1_t))
     sign2 = np.sign(np.cross(-poles_unit, force2_t))
     
-    # Torque = r × F
+    # Torque = r Ã— F
     torque = sign1 * LA.norm(force1_t) * r + sign2 * LA.norm(force2_t) * r
     
     return torque
@@ -1406,7 +1357,7 @@ def update_microtubules(
                     rate = (config.shrink_rate if new_mt_states[i, j] == -1 
                            else config.growth_rate)
                 
-                # Update length
+                # Update MT geometry and length
                 if new_mt_states[i, j] == -1:
                     # Shrinking
                     old_tip = (state.spindle_poles[i] + 
@@ -1429,11 +1380,15 @@ def update_microtubules(
                     if LA.norm(new_tip - state.spindle_poles[i]) > LA.norm(cortex_point - state.spindle_poles[i]):
                         new_tip = cortex_point
                     
+                    # Update MT geometry
                     new_astral_mts[i, j, -1] = new_tip
                     new_astral_mts[i, j] = restructure_mt(new_astral_mts[i, j])
                     
-                    # Check if too short
-                    if LA.norm(new_tip - state.spindle_poles[i]) < config.mt_min_length:
+                    # Update length immediately after geometry update
+                    new_mt_lengths[i, j] = LA.norm(new_tip - state.spindle_poles[i])
+                    
+                    # Check if too short using updated length
+                    if new_mt_lengths[i, j] < config.mt_min_length:
                         # Nucleate new MT
                         new_length = (config.mt_mean_length if config.length_distribution == "constant"
                                      else np.random.gamma(config.mt_mean_length, config.mt_length_stdev))
@@ -1446,6 +1401,7 @@ def update_microtubules(
                         )
                         new_astral_mts[i, j, -1] = new_tip
                         new_astral_mts[i, j] = restructure_mt(new_astral_mts[i, j])
+                        new_mt_lengths[i, j] = LA.norm(new_tip - state.spindle_poles[i])
                         new_mt_states[i, j] = 1
                 
                 else:
@@ -1459,11 +1415,9 @@ def update_microtubules(
                     )
                     new_astral_mts[i, j, -1] = new_tip
                     new_astral_mts[i, j] = restructure_mt(new_astral_mts[i, j])
-                
-                # Update length
-                new_mt_lengths[i, j] = LA.norm(
-                    new_astral_mts[i, j, -1] - state.spindle_poles[i]
-                )
+                    
+                    # Update length immediately after geometry update
+                    new_mt_lengths[i, j] = LA.norm(new_tip - state.spindle_poles[i])
                 
                 # Check for new binding/pushing
                 (new_which_bind[i, j], new_which_push[i, j], new_mt_states[i, j],
@@ -1507,7 +1461,7 @@ def plot_cell(
     output_dir: Path
 ):
     """
-    Plot cell, spindle, MTs, and forces.
+    Plot cell, spindle, MTs, and forces (original visualization style).
     
     Args:
         config: Simulation configuration
@@ -1518,6 +1472,7 @@ def plot_cell(
         output_dir: Directory to save plots
     """
     if not config.save_plots:
+        print(f"Skipping plot for step {step} as save_plots is False.")
         return
     
     # Calculate force statistics
@@ -1714,9 +1669,9 @@ def plot_cell(
         for i in range(n_chrom):
             line1, line2 = draw_chromosome(xs[i], ys[i], chrom_angle)
             plt.plot([state.spindle_poles[0, 0], xs[i]], 
-                    [state.spindle_poles[0, 1], ys[i]], color='g', linewidth=10)
+                    [state.spindle_poles[0, 1], ys[i]], color='g', linewidth=12)
             plt.plot([state.spindle_poles[1, 0], xs[i]], 
-                    [state.spindle_poles[1, 1], ys[i]], color='g', linewidth=10)
+                    [state.spindle_poles[1, 1], ys[i]], color='g', linewidth=12)
             plt.plot(line1[0], line1[1], color='dodgerblue', linewidth=14)
             plt.plot(line2[0], line2[1], color='dodgerblue', linewidth=14)
     
@@ -1729,6 +1684,7 @@ def plot_cell(
                     bbox_inches='tight', pad_inches=1, dpi=300)
 
     else:
+        print(f"Saving plot for step {step}... at {output_dir / f'{config.cell_type}_{step}.pdf'}")
         plt.savefig(output_dir / f'{config.cell_type}_{step}.pdf', 
                     bbox_inches='tight', pad_inches=1)
     plt.close(fig)
@@ -1765,7 +1721,7 @@ def draw_chromosome(x: float, y: float, angle: float) -> Tuple[np.ndarray, np.nd
 
 
 # ============================================================================
-# EXCEL OUTPUT
+# EXCEL OUTPUT (MATCHING ORIGINAL FORMAT)
 # ============================================================================
 
 def save_results_to_excel(
@@ -1843,6 +1799,73 @@ def save_results_to_excel(
     return excel_path
 
 
+def save_results_to_excel_custom_path(
+    config: CellConfig,
+    trajectory: List[SimulationState],
+    angles: np.ndarray,
+    centers: np.ndarray,
+    push_forces_list: List[np.ndarray],
+    pull_forces_list: List[np.ndarray],
+    excel_path: Path,
+    run_id: int = 1
+):
+    """Save simulation results to Excel file with custom path."""
+    
+    # Extract data from trajectory
+    df_angle = angles.tolist()
+    df_center = [LA.norm(center) for center in centers]  # Distance from origin
+    df_ypos = centers[:, 1].tolist()  # Y-position
+    
+    # Count pulling and pushing MTs at each timestep
+    df_count_pull = [np.sum(state.which_bind) for state in trajectory]
+    df_count_push = [np.sum(state.which_push) for state in trajectory]
+    
+    # Calculate ratio and total forces at each timestep
+    df_ratio = []
+    df_pull_t = []
+    df_push_t = []
+    
+    for i in range(len(trajectory)):
+        push_force = push_forces_list[i]
+        pull_force = pull_forces_list[i]
+        
+        pull_total = np.sum(pull_force[0] + pull_force[1], axis=0)
+        push_total = np.sum(push_force[0] + push_force[1], axis=0)
+        
+        pull_mag = LA.norm(pull_total)
+        push_mag = LA.norm(push_total)
+        
+        if (pull_mag + push_mag) == 0:
+            ratio = 0
+        else:
+            ratio = 100 * pull_mag / (pull_mag + push_mag)
+        
+        df_ratio.append(ratio)
+        df_pull_t.append(pull_mag)
+        df_push_t.append(push_mag)
+    
+    # Create dictionary matching original format
+    data_dict = {
+        "Angle": df_angle,
+        "Center": df_center,
+        "Y-pos": df_ypos,
+        "N_pull": df_count_pull,
+        "N_push": df_count_push,
+        "Ratio": df_ratio,
+        "Pull_t": df_pull_t,
+        "Push_t": df_push_t
+    }
+    
+    # Save to Excel with original format
+    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+        for sheet_name, data in data_dict.items():
+            df = pd.DataFrame({f"Run {run_id}": data})
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+    
+    print(f"  - Excel: {excel_path.name}")
+    return excel_path
+
+
 def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     """Run complete simulation."""
     
@@ -1851,12 +1874,12 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     print(f"{'='*80}\n")
     
     # Initialize
-    np.random.seed(config.seed+run_id-1)
-    random.seed(config.seed+run_id-1)
+    np.random.seed(config.seed + run_id - 1)
+    random.seed(config.seed + run_id - 1)
     
     cell = make_cell_boundary(config, t_time=0)
     spindle_poles, spindle_angle = initialize_spindle(config, cell)
-    fgs = make_fgs(config, cell, frame=1)
+    fgs = make_fgs(config, cell, spindle_poles, frame=1)
     
     (astral_mts, astral_angles, mt_states, which_push, which_bind,
      free_fgs, astral_which_fg, mt_lengths) = initialize_microtubules(
@@ -1888,15 +1911,60 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     print(f"  Time step: {config.time_step} s")
     print(f"  Total steps: {int(config.total_time / config.time_step)}\n")
     
-    # Create output directory
-    if isinstance(config, ZebrafishEndoConfig):
-        output_dir = config.output_dir / f"SM_{config.cell_type}_cell_{config.endo_index}_run_{run_id}"
-    else:
-        output_dir = config.output_dir / f"SM_{config.cell_type}_run_{run_id}"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Auto-detect SLURM and create appropriate directory structure
+    slurm_task_id = os.getenv('SLURM_ARRAY_TASK_ID')
+    slurm_job_name = os.getenv('SLURM_JOB_NAME')
     
-    # Save initial configuration
-    save_config(config, output_dir / "config.json")
+    if slurm_task_id:
+        # SLURM array mode - use date-based structure
+        from datetime import date
+        today_date = date.today().strftime('%Y-%m-%d')
+        job_name = slurm_job_name or "simulation"
+        
+        # Date-based structure: YYYY-MM-DD/{job_name}/
+        date_folder = config.output_dir / today_date
+        base_dir = date_folder / job_name
+        
+        # Subdirectories (created by SLURM script)
+        images_base = base_dir / f"{job_name}_images"
+        stats_base = base_dir / f"{job_name}_stats"
+        
+        # Task-specific directories
+        images_dir = images_base / f"{job_name}_task_{slurm_task_id}"
+        excel_dir = stats_base  # Excel files go directly in stats folder
+        
+        # Create task-specific image directory
+        images_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save config at base level (once per ensemble)
+        config_path = base_dir / "config.json"
+        if not config_path.exists():
+            save_config(config, config_path)
+        
+        # Set output directories
+        plots_dir = images_dir
+        excel_output_dir = excel_dir
+        
+        print(f"SLURM mode detected:")
+        print(f"  Date folder: {date_folder}")
+        print(f"  Ensemble: {base_dir}")
+        print(f"  Task images: {images_dir}")
+        print(f"  Excel output: {excel_dir}")
+        
+    else:
+        # Single run mode (existing structure)
+        if isinstance(config, ZebrafishEndoConfig):
+            output_dir = config.output_dir / f"SM_{config.cell_type}_cell_{config.endo_index}_run_{run_id}"
+        else:
+            output_dir = config.output_dir / f"SM_{config.cell_type}_run_{run_id}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save config in run directory
+        save_config(config, output_dir / "config.json")
+        
+        # Set output directories
+        plots_dir = output_dir
+        excel_output_dir = output_dir
     
     # Storage
     trajectory = [state]
@@ -1909,7 +1977,7 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     push_forces, pull_forces = calculate_forces(config, state)
     push_forces_list.append(push_forces)
     pull_forces_list.append(pull_forces)
-    plot_cell(config, state, push_forces, pull_forces, 0, output_dir)
+    plot_cell(config, state, push_forces, pull_forces, 0, plots_dir)
     
     # Time loop
     n_steps = int(config.total_time / config.time_step)
@@ -1960,8 +2028,7 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
         
         # Calculate forces
         push_forces, pull_forces = calculate_forces(config, state)
-        push_forces_list.append(push_forces)
-        pull_forces_list.append(pull_forces)
+        
         # Update spindle
         new_poles, new_angle, velocity = update_spindle_position(
             config, state, push_forces, pull_forces
@@ -1995,17 +2062,22 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
         angles.append(np.rad2deg(state.spindle_angle))
         centers.append(np.mean(state.spindle_poles, axis=0))
         
+        # Calculate and store forces for this timestep
+        push_forces, pull_forces = calculate_forces(config, state)
+        push_forces_list.append(push_forces)
+        pull_forces_list.append(pull_forces)
         
         # Plot at specified intervals
-        if config.save_plots and (step + 1) % config.plot_interval == 0 :
-            # push_forces, pull_forces = calculate_forces(config, state)
-            plot_cell(config, state, push_forces, pull_forces, step + 1, output_dir)
+        if (step + 1) % config.plot_interval == 0:
+            push_forces, pull_forces = calculate_forces(config, state)
+            print(f'plotting step {step + 1}...')
+            plot_cell(config, state, push_forces, pull_forces, step + 1, plots_dir)
         
         # Progress
-        # if (step + 1) % 100 == 0:
-        #     print(f"  Step {step+1}/{n_steps} - " +
-        #           f"t={state.time:.2f}s - " +
-        #           f"angle={np.rad2deg(state.spindle_angle):.1f}°")
+        if (step + 1) % 100 == 0:
+            print(f"  Step {step+1}/{n_steps} - " +
+                  f"t={state.time:.2f}s - " +
+                  f"angle={np.rad2deg(state.spindle_angle):.1f}Â°")
     
     print(f"\n{'='*80}")
     print("Simulation complete!")
@@ -2016,14 +2088,30 @@ def simulate(config: CellConfig, run_id: int = 1) -> Dict[str, Any]:
     centers_array = np.array(centers)
     
     # Save to Excel (matching original format)
-    save_results_to_excel(
-        config, trajectory, angles_array, centers_array,
-        push_forces_list, pull_forces_list, output_dir, run_id
-    )
+    if slurm_task_id:
+        # SLURM mode: task-specific filename
+        excel_filename = f"task_{slurm_task_id}.xlsx"
+        excel_path = excel_output_dir / excel_filename
+        save_results_to_excel_custom_path(
+            config, trajectory, angles_array, centers_array,
+            push_forces_list, pull_forces_list, excel_path, run_id
+        )
+    else:
+        # Single run mode: use default naming
+        save_results_to_excel(
+            config, trajectory, angles_array, centers_array,
+            push_forces_list, pull_forces_list, excel_output_dir, run_id
+        )
     
-    print(f"Results saved to: {output_dir}")
-    print(f"  - Plots: {len(list(output_dir.glob('*.pdf')))} frames")
-    print(f"  - Data: Excel file with all results")
+    if slurm_task_id:
+        print(f"Results saved to: {base_dir}")
+        print(f"  - Plots: {plots_dir}")
+        print(f"  - Data: {excel_output_dir}")
+        print(f"  - Plots count: {len(list(plots_dir.glob('*.pdf')))} frames")
+    else:
+        print(f"Results saved to: {plots_dir}")
+        print(f"  - Plots: {len(list(plots_dir.glob('*.pdf')))} frames")
+        print(f"  - Data: Excel file with all results")
     
     results = {
         "config": config,
@@ -2147,7 +2235,7 @@ def example_celegans_pnc():
         total_time=30.0,
         spindle_half_length=0.5,
         spindle_width=0.5,
-        spindle_angle_init=0,  # Auto-set to 90°
+        spindle_angle_init=0,  # Auto-set to 90Â°
         n_astral_mts=100,
         fg_density_anterior=40,
         fg_density_posterior=60,
@@ -2211,6 +2299,158 @@ def example_zebrafish_uniform():
 # MAIN EXECUTION
 # ============================================================================
 
+# ============================================================================
+# ARGUMENT PARSING & MAIN EXECUTION
+# ============================================================================
+
+def create_default_configs():
+    """Create default configurations for each cell type."""
+    defaults = {
+        'follicle_epithelial': FollicleEpithelialConfig(
+            time_step=0.05,
+            total_time=600.0,
+            spindle_half_length=0.4,
+            spindle_width=0.32,
+            spindle_angle_init=np.deg2rad(90),
+            n_astral_mts=100,
+            fg_density=100,
+            mt_mean_length=1.0,
+            mt_length_stdev=1.0,
+            pull_force=5.0,
+            push_force=0.0
+        ),
+        'neuroblast': NeuroblastConfig(
+            time_step=0.05,
+            total_time=600.0,
+            spindle_half_length=0.4,
+            spindle_width=0.32,
+            spindle_angle_init=np.deg2rad(90),
+            n_astral_mts=100,
+            fg_density_basal=100,
+            fg_density_apical=100,
+            mt_mean_length=1.0,
+            mt_length_stdev=1.0,
+            pull_force=5.0,
+            push_force=0.0
+        ),
+        'celegans_pnc': CElegansPNCConfig(
+            time_step=0.05,
+            total_time=300.0,
+            spindle_half_length=0.5,
+            spindle_width=0.5,
+            spindle_angle_init=0,  # Auto-set to 90°
+            n_astral_mts=100,
+            fg_density_anterior=40,
+            fg_density_posterior=60,
+            mt_mean_length=9.0,
+            mt_length_stdev=0.167,
+            pull_force=5.0,
+            push_force=0.0
+        ),
+        'celegans_spindle': CElegansSpindleConfig(
+            time_step=0.05,
+            total_time=180.0,
+            spindle_half_length=0.9,
+            spindle_width=0.5,
+            spindle_angle_init=0,
+            n_astral_mts=100,
+            fg_density_anterior=40,
+            fg_density_posterior=60,
+            mt_mean_length=9.0,
+            mt_length_stdev=0.167,
+            pull_force=5.0,
+            push_force=5.0
+        ),
+        'zebrafish_endo': ZebrafishEndoConfig(
+            time_step=0.05,
+            total_time=None,  # Auto from Excel
+            spindle_half_length=0.18,
+            spindle_width=0.08,
+            spindle_angle_init=0,
+            n_astral_mts=100,
+            fg_density=10,
+            mt_mean_length=1.0,
+            mt_length_stdev=1.0,
+            pull_force=5.0,
+            push_force=0.0,
+            endo_index=11,
+            fg_distribution="uniform",
+            movie_info_file=Path("./data/Movie_info.xlsx"),
+            cell_images_dir=Path("./data/cells"),
+            spindle_images_dir=Path("./data/spindles")
+        )
+    }
+    return defaults
+
+
+def parse_arguments():
+    """Parse command line arguments."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Spindle Positioning Simulation',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python spindle.py config.json                    # Use config file
+  python spindle.py --cell_type follicle_epithelial --n_astral_mts 100 --pull_force 5.0
+  python spindle.py --cell_type neuroblast --fg_density_apical 200 --time_step 0.01
+        """
+    )
+    
+    # Config file (optional)
+    parser.add_argument('config_file', nargs='?', help='JSON configuration file')
+    
+    # Cell type (required if not using config file)
+    parser.add_argument('--cell_type', choices=['follicle_epithelial', 'neuroblast', 'celegans_pnc', 'celegans_spindle', 'zebrafish_endo'],
+                       help='Cell type to simulate')
+    
+    # Common parameters
+    parser.add_argument('--time_step', type=float, help='Simulation time step (s)')
+    parser.add_argument('--total_time', type=float, help='Total simulation time (s)')
+    parser.add_argument('--seed', type=int, help='Random seed')
+    parser.add_argument('--n_astral_mts', type=int, help='Number of astral microtubules per pole')
+    parser.add_argument('--pull_force', type=float, help='Pulling force magnitude (pN)')
+    parser.add_argument('--push_force', type=float, help='Pushing force magnitude (pN)')
+    parser.add_argument('--spindle_half_length', type=float, help='Half length of spindle')
+    parser.add_argument('--spindle_width', type=float, help='Width of spindle')
+    parser.add_argument('--mt_mean_length', type=float, help='Mean MT length')
+    parser.add_argument('--mt_length_stdev', type=float, help='MT length standard deviation')
+    parser.add_argument('--viscosity', type=float, help='Cytoplasmic viscosity')
+    
+    # Cell type specific parameters
+    parser.add_argument('--fg_density', type=int, help='Force generator density (follicle/zebrafish)')
+    parser.add_argument('--fg_density_basal', type=int, help='Basal FG density (neuroblast)')
+    parser.add_argument('--fg_density_apical', type=int, help='Apical FG density (neuroblast)')
+    parser.add_argument('--fg_density_anterior', type=int, help='Anterior FG density (C. elegans)')
+    parser.add_argument('--fg_density_posterior', type=int, help='Posterior FG density (C. elegans)')
+    parser.add_argument('--endo_index', type=int, help='Endothelial cell index (zebrafish)')
+    
+    
+    parser.add_argument('--plot_interval', type=int, help='Plot every N steps')
+    parser.add_argument('--output_dir', help='Output directory')
+    
+    return parser.parse_args()
+
+
+def override_config_with_args(config: CellConfig, args) -> CellConfig:
+    """Override config parameters with command line arguments."""
+    
+    # Get all argument values that are not None
+    overrides = {k: v for k, v in vars(args).items() if v is not None and k not in ['config_file', 'cell_type']}
+    
+    # # Handle special cases
+    if args.output_dir:
+        overrides['output_dir'] = Path(args.output_dir)
+    
+    # Create new config with overrides
+    config_dict = config.__dict__.copy()
+    config_dict.update(overrides)
+    
+    # Create new config object of the same type
+    return type(config)(**config_dict)
+
+
 if __name__ == "__main__":
     import sys
     
@@ -2219,27 +2459,49 @@ if __name__ == "__main__":
     print("=" * 80)
     print()
     
+    # Parse arguments
+    args = parse_arguments()
+    
     # Get run_id from SLURM array task ID if available, otherwise default to 1
     run_id = int(os.getenv('SLURM_ARRAY_TASK_ID', 1))
     
-    # Check command line arguments
-    if len(sys.argv) > 1:
-        config_file = Path(sys.argv[1])
+    # Load configuration
+    if args.config_file:
+        # Use config file
+        config_file = Path(args.config_file)
         if config_file.exists():
             print(f"Loading configuration from: {config_file}")
             config = load_config(config_file)
-            results = simulate(config, run_id)
             
-            # Save results
-            output_dir = config.output_dir / f"run_{config.cell_type}"
-            print(f"\nResults saved to: {output_dir}")
+            # Override with command line arguments if provided
+            if any(v is not None for k, v in vars(args).items() if k not in ['config_file', 'cell_type']):
+                print("Overriding config with command line arguments...")
+                config = override_config_with_args(config, args)
         else:
             print(f"Error: Config file not found: {config_file}")
             sys.exit(1)
+    
+    elif args.cell_type:
+        # Use default config + command line overrides
+        print(f"Using default {args.cell_type} configuration")
+        defaults = create_default_configs()
+        config = defaults[args.cell_type]
+        
+        # Override with command line arguments
+        config = override_config_with_args(config, args)
+        
+        print(f"Parameters: n_astral_mts={config.n_astral_mts}, pull_force={config.pull_force}")
+    
     else:
-        print("No config file provided. Running default example (C. elegans spindle).")
-        print()
-        results = example_zebrafish_uniform()
+        # No config file or cell type specified
+        print("Error: Must specify either config file or --cell_type")
+        print("Examples:")
+        print("  python spindle.py config.json")
+        print("  python spindle.py --cell_type follicle_epithelial --n_astral_mts 100")
+        sys.exit(1)
+    
+    # Run simulation
+    results = simulate(config, run_id)
     
     print()
     print("=" * 80)
