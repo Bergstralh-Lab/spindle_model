@@ -13,11 +13,12 @@ python spindle.py --cell_type follicle_epithelial
 python spindle.py --cell_type follicle_epithelial --n_astral_mts 100 --pull_force 8.0
 ```
 
-### Parameter Sweep
+### In case you want run a bunch of simulations with SLURM
 ```bash
 # Edit parameter arrays in multi_param_submit.sh, then run:
 ./multi_param_submit.sh
 ```
+# Adjust SLURM partition, time etc in slurm_submit.sh
 
 ## Cell Types & Key Parameters
 
@@ -28,7 +29,7 @@ python spindle.py --cell_type follicle_epithelial \
   --n_astral_mts 100 \           # Microtubules per pole
   --fg_density 100 \             # Number of force generators
   --pull_force 5.0 \             # Pulling force (pN)
-  --spindle_half_length 0.4      # Half-length of spindle
+  --spindle_half_length 0.45      # Half-length of spindle
 ```
 
 ### Neuroblast (`neuroblast`)
@@ -80,7 +81,7 @@ python spindle.py --cell_type zebrafish_endo \
 ### Force Generators (`fg_density`)
 - **Zebrafish**: Actual density (FGs per unit perimeter) - default 10
 - **All others**: Actual count of force generators - default 100
-- Controls cortical force magnitude
+
 
 ### Forces
 - `pull_force`: Magnitude when MT binds to cortical motor (pN)
@@ -89,30 +90,11 @@ python spindle.py --cell_type zebrafish_endo \
 
 ### Timing
 - `time_step`: Integration timestep (s) - default 0.05
-- `total_time`: Simulation duration (s) - default 30.0
+- `total_time`: Simulation duration (s) 
 - Smaller timesteps = more accurate but slower
 
-## Common Parameter Combinations
 
-### High Force Regime
-```bash
-python spindle.py --cell_type follicle_epithelial \
-  --n_astral_mts 200 --pull_force 10.0 --push_force 2.0
-```
-
-### Fine Dynamics
-```bash
-python spindle.py --cell_type neuroblast \
-  --time_step 0.01 --total_time 10.0 --fg_density_apical 200
-```
-
-### Quick Test Run
-```bash
-python spindle.py --cell_type follicle_epithelial \
-  --total_time 5.0 --no_plots --n_astral_mts 50
-```
-
-## Parameter Sweeps
+## Testing a range of values for selected parameters
 
 ### Single Parameter
 Edit `multi_param_submit.sh`:
@@ -185,20 +167,4 @@ squeue -u $USER
 # Cancel all jobs
 scancel -u $USER
 
-# Monitor specific job
-seff JOBID
 ```
-
-## Common Issues
-
-**Memory errors**: Reduce `n_astral_mts` or use `--no_plots`
-
-**Long runtimes**: Decrease `total_time` or increase `time_step`
-
-**Zebrafish data missing**: Ensure `./data/` contains experimental files
-
-**Wrong FG counts**: Remember zebrafish uses density, others use count
-
----
-
-**Parameter sweep workflow**: Edit arrays → Run script → Monitor jobs → Analyze results
