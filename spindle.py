@@ -2317,7 +2317,7 @@ def create_default_configs():
             mt_mean_length=1.0,
             mt_length_stdev=1.0,
             pull_force=5.0,
-            push_force=0.0
+            push_force=5.0
         ),
         'neuroblast': NeuroblastConfig(
             time_step=0.05,
@@ -2331,21 +2331,21 @@ def create_default_configs():
             mt_mean_length=1.0,
             mt_length_stdev=1.0,
             pull_force=5.0,
-            push_force=0.0
+            push_force=5.0
         ),
         'celegans_pnc': CElegansPNCConfig(
             time_step=0.05,
             total_time=300.0,
             spindle_half_length=0.5,
             spindle_width=0.5,
-            spindle_angle_init=0,  # Auto-set to 90°
+            spindle_angle_init=np.deg2rad(90),  # Auto-set to 90°
             n_astral_mts=100,
             fg_density_anterior=40,
             fg_density_posterior=60,
             mt_mean_length=9.0,
             mt_length_stdev=0.167,
             pull_force=5.0,
-            push_force=0.0
+            push_force=5.0
         ),
         'celegans_spindle': CElegansSpindleConfig(
             time_step=0.05,
