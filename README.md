@@ -3,7 +3,8 @@
 A computational model for simulating mitotic spindle positioning across multiple cell types during cell division.
 
 ## Quick Start
-
+### Jupyter notebook
+To try the model interactively, download `spindle.py` and `spindle_demo.ipynb` from this repository and place them in the same folder.
 ### Single Simulation
 ```bash
 # Basic follicle epithelial cell simulation
