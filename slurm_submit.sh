@@ -24,7 +24,7 @@ mkdir -p "$ensemble_folder"
 mkdir -p "$ensemble_folder/${SLURM_JOB_NAME}_images"
 mkdir -p "$ensemble_folder/${SLURM_JOB_NAME}_stats"
 
-# Pass ALL arguments directly to Python (the magic!)
+# Pass ALL arguments directly to Python 
 python3 spindle.py "$@"
 
 echo "Simulation complete for task $SLURM_ARRAY_TASK_ID"

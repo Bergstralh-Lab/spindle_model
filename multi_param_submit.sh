@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Multi-parameter sweep - edit these arrays for any parameters!
+# Multi-parameter sweep - edit these arrays for any parameters
 n_astral_mts=(100)
 pull_force=(5)
 push_force=(0.0)
@@ -23,7 +23,7 @@ for n_mts in "${n_astral_mts[@]}"; do
         # Create job name
         job_name="${CELL_TYPE}_MT_${n_mts}_pull_${pull}_push_${push}_SL_${sl}_test_1"
         
-        # Build argument string (any parameters can go here!)
+        # Build argument string 
         args="--cell_type $CELL_TYPE --n_astral_mts $n_mts --pull_force $pull  --push_force $push"
         
         echo "Submitting: $job_name"
