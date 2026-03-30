@@ -14,12 +14,12 @@ python spindle.py --cell_type follicle_epithelial
 python spindle.py --cell_type follicle_epithelial --n_astral_mts 100 --pull_force 8.0
 ```
 
-### In case you want run a bunch of simulations with SLURM
+### (WORK IN PROGRESS) In case you want run a bunch of simulations with SLURM
 ```bash
 # Edit parameter arrays in multi_param_submit.sh, then run:
 ./multi_param_submit.sh
 ```
-# Adjust SLURM partition, time etc in slurm_submit.sh
+# (WORK IN PROGRESS) Adjust SLURM partition, time etc in slurm_submit.sh
 
 ## Cell Types & Key Parameters
 
