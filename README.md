@@ -1,171 +1,75 @@
-# Spindle Positioning Simulation - User Guide
+# Spindle Orientation Model
 
-A computational model for simulating mitotic spindle positioning across multiple cell types during cell division.
+A simulation of mitotic spindle orientation inside a cell cortex, driven by astral
+microtubules (pushing) and cortical force-generator motors (pulling). Supports three
+cell/organism systems: fly follicular epithelium/neuroblast, *C. elegans* (pronuclei
+centering and metaphase/anaphase spindle positioning), and zebrafish embryonic cells
+(using real tracked-movie cell shapes).
 
-## Quick Start
-### Jupyter notebook
-To try the model interactively, download `spindle.py` and `spindle_demo.ipynb` from this repository and place them in the same folder.
-### Single Simulation
-```bash
-# Basic follicle epithelial cell simulation
-python spindle.py --cell_type follicle_epithelial
+## Contents
 
-# With custom parameters
-python spindle.py --cell_type follicle_epithelial --n_astral_mts 100 --pull_force 8.0
+- `spindle_model.py` — the model (single file, no build step).
+- `Spindle_Simulator.ipynb` — widget-driven notebook for running a single simulation
+  interactively (works locally or on Google Colab).
+- `data/` — tracked-movie inputs for the zebrafish cell type (cell shapes, spindle
+  masks, junction coordinates, movie metadata).
+
+## Requirements
+
+Python 3 with `numpy`, `matplotlib`, `opencv-python`, `pandas`, `openpyxl`, `shapely`,
+`scipy`, and `ipywidgets` (only needed for the notebook UI).
+
+## Quickstart (notebook)
+
+Open `Spindle_Simulator.ipynb` and run the cells top to bottom — pick a cell type,
+adjust the settings, click **Run simulation**.
+
+## Quickstart (Python)
+
+```python
+from spindle_model import run_simulation
+
+results = run_simulation(
+    cell_type="FE",       # "FE" | "celegans" | "endo"
+    motor_density=10,     # motor count (FE/celegans) or density (endo)
+    n_astral_mt=50,
+    push=1, pull=0,
+    spindle_length=0.8,   # model units; FE and celegans "spindle" mode only
+    total_time=600,       # seconds; None -> cell-type default
+)
 ```
 
-### (WORK IN PROGRESS) In case you want run a bunch of simulations with SLURM
-```bash
-# Edit parameter arrays in multi_param_submit.sh, then run:
-./multi_param_submit.sh
-```
-# (WORK IN PROGRESS) Adjust SLURM partition, time etc in slurm_submit.sh
+Key kwargs: `neuroblast=True` (FE apical-only placement), `celegans_mode="PNC"|"spindle"`,
+`endo_cell_number=<n>` (required for `cell_type="endo"`; see `list_available_endo_cells()`),
+`initial_angle`, `time_step`, `seed`, `advanced={...}` (override physical constants). Returns
+a dict of result arrays (angle, position, push/pull counts vs. time) and writes an `.xlsx` to
+`data_folder_path`.
 
-## Cell Types & Key Parameters
-
-### Follicle Epithelial (`follicle_epithelial`)
-*Drosophila* follicular epithelium with basal/lateral force generators
-```bash
-python spindle.py --cell_type follicle_epithelial \
-  --n_astral_mts 100 \           # Microtubules per pole
-  --fg_density 100 \             # Number of force generators
-  --pull_force 5.0 \             # Pulling force (pN)
-  --spindle_half_length 0.45      # Half-length of spindle
-```
-
-### Neuroblast (`neuroblast`)
-*Drosophila* neuroblasts with apical force generator enrichment
-```bash
-python spindle.py --cell_type neuroblast \
-  --n_astral_mts 100 \
-  --fg_density_apical 100 \      # Apical force generators
-  --fg_density_basal 100 \       # Basal force generators  
-  --pull_force 5.0
-```
-
-### C. elegans PNC (`celegans_pnc`)
-Posterior-enriched force generators, superellipse geometry
-```bash
-python spindle.py --cell_type celegans_pnc \
-  --n_astral_mts 100 \
-  --fg_density_anterior 40 \     # Anterior force generators
-  --fg_density_posterior 60 \    # Posterior force generators
-  --mt_mean_length 9.0           # Longer MTs than other systems
-```
-
-### C. elegans Spindle (`celegans_spindle`)
-Uniform force distribution, superellipse geometry
-```bash
-python spindle.py --cell_type celegans_spindle \
-  --n_astral_mts 100 \
-  --fg_density_anterior 40 \
-  --fg_density_posterior 60 \
-  --push_force 5.0               # Include pushing forces
-```
-
-### Zebrafish Endothelial (`zebrafish_endo`)
-Live imaging data with dynamic cell shapes
-```bash
-python spindle.py --cell_type zebrafish_endo \
-  --endo_index 11 \              # Cell index from experimental data
-  --fg_density 10 \              # Density per unit perimeter (not count!)
-  --fg_distribution uniform      # or "junctions" (requires junction data)
-```
-
-## Important Parameter Notes
-
-### Microtubules (`n_astral_mts`)
-- **Per pole** - if you set 100, total MTs = 200 (100 per spindle pole)
-- Typical ranges: 50-200 per pole
-- More MTs = stronger forces but slower simulation
-
-### Force Generators (`fg_density`)
-- **Zebrafish**: Actual density (FGs per unit perimeter) - default 10
-- **All others**: Actual count of force generators - default 100
-
-
-### Forces
-- `pull_force`: Magnitude when MT binds to cortical motor (pN)
-- `push_force`: Magnitude when MT pushes against cortex (pN)  
-- Typical: 0-10 pN range
-
-### Timing
-- `time_step`: Integration timestep (s) - default 0.05
-- `total_time`: Simulation duration (s) 
-- Smaller timesteps = more accurate but slower
-
-
-## Testing a range of values for selected parameters
-
-### Single Parameter
-Edit `multi_param_submit.sh`:
-```bash
-# Change these arrays:
-n_astral_mts=(50 100 200)        # Parameter to sweep
-pull_force=(5)                   # Keep others fixed
-push_force=(0.0)
-spindle_half_length=(0.45)
-```
-
-### Multi-Parameter
-```bash
-# Test different combinations:
-n_astral_mts=(100 200)
-pull_force=(3.0 5.0 8.0)
-push_force=(0.0 2.0)
-spindle_half_length=(0.4 0.5)
-# Results in 2×3×2×2 = 24 parameter combinations
-```
-
-### Custom Parameters
-Add any parameter to the `args` line:
-```bash
-args="--cell_type $CELL_TYPE --n_astral_mts $n_mts --viscosity 150 --time_step 0.01"
-```
-
-## Output Structure
-
-### Single Run
-```
-output/SM_follicle_epithelial_run_1/
-├── config.json                    # Parameters used
-├── follicle_epithelial_*.pdf      # Simulation snapshots
-└── follicle_epithelial_data.xlsx  # Time series data
-```
-
-### Parameter Sweep
-```
-output/2024-11-12/                 # Date of run
-└── follicle_epithelial_MT_100_pull_5_push_0.0_SL_0.45_test_1/
-    ├── config.json
-    ├── *_images/
-    │   ├── *_task_1/              # Run 1 plots
-    │   └── *_task_20/             # Run 20 plots
-    └── *_stats/
-        ├── task_1.xlsx            # Run 1 data
-        └── task_20.xlsx           # Run 20 data
-```
-
-## Excel Data Format
-
-Each Excel file contains sheets:
-- **Angle**: Spindle angle over time (degrees)
-- **N_pull**: Number of pulling microtubules
-- **N_push**: Number of pushing microtubules  
-- **Pull_t**: Total pulling force (pN)
-- **Push_t**: Total pushing force (pN)
-- **Ratio**: Pull/(Pull+Push) percentage
-
-## SLURM Management
-
-```bash
-# Submit parameter sweep
-./multi_param_submit.sh
-
-# Check jobs
-squeue -u $USER
-
-# Cancel all jobs
-scancel -u $USER
+## Quickstart (command line / Slurm)
 
 ```
+python spindle_model.py <test_folder_path> <data_folder_path> <run_name>
+```
+
+`run_name` encodes the cell type (via a `cell_<Type>` token) and every parameter as regex
+tokens, e.g.:
+
+```
+spindle_9214_cell_FE_MUD_10_MT_50_push_1_pull_0_ts_0.05_AL_1_state_default_angle_45_SL_1.8
+```
+
+`MUD`=motor density, `MT`=astral MT count, `push`/`pull`=on-off flags, `ts`=time step,
+`AL`=astral MT length distribution, `state`=MT state-init mode, `angle`=initial spindle
+angle, `SL`=spindle length. For `celegans` runs, the name must also contain `_PNC_` or
+`_position_`; for zebrafish/`endo` runs, a `cell_<n>` token selects the tracked cell. Reads
+`SLURM_ARRAY_TASK_ID`/`SLURM_JOB_ID` if set, otherwise runs as a plain local command.
+
+## Cell types
+
+- **FE** — fly follicular epithelium / neuroblast (idealized elliptical cell).
+- **celegans** — *C. elegans* embryo; `PNC` (pronuclei centering) or `spindle`
+  (metaphase/anaphase positioning) sub-modes.
+- **endo** — zebrafish embryonic cell, using a real cell shape tracked from a movie
+  (requires the matching entry under `data/`).
+
+Units: lengths are in model units (1 model unit = 10 µm); time is in seconds.
